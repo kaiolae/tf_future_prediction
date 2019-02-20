@@ -1,4 +1,4 @@
-'''
+'''dd
 Implementation of our standard agent, with expectation/action split
 '''
 from __future__ import print_function
@@ -73,19 +73,33 @@ class FuturePredictorAgentAdvantage(Agent):
         return full_loss, errs_to_print, short_summary, detailed_summary
         
     def act_net(self, state_imgs, state_meas, objective_coeffs):
+        #KOE The method that calculates the next action through the net, for this type of agent (the type used in the paper).
         #Act given a state and objective_coeffs
+        #Takes as inputs N different states/measurements and returns N different actions. All from same network, but from different instantiations of the simulator. (multi_doom_simulator)
+        #I wonder if this is to increase efficiency?
+
+        #The objective-weights array is repaeted to have as many as there are states.
+        #The array has length N*M where N is the number of objectives and M is the number of relevant timesteps.
+        #E.g. for the D3-case, we have [0.25 0.25 0.5  0.25 0.25 0.5  0.5  0.5  1.  ]
+        #This is produced via the method make_objective_indices_and_coeffs, which combines temporal + objective weights into 1 array.
         if objective_coeffs.ndim == 1:
             curr_objective_coeffs = np.tile(objective_coeffs[None,:],(state_imgs.shape[0],1))
         else:
             curr_objective_coeffs = objective_coeffs
-        
-        predictions = self.sess.run(self.pred_all, feed_dict={self.input_images: state_imgs, 
+
+        print("**************Calculating action.******************")
+        print("Input objectives: ", curr_objective_coeffs)
+
+        predictions = self.sess.run(self.pred_all, feed_dict={self.input_images: state_imgs,
                                                               self.input_measurements: state_meas,
                                                               self.input_objective_coeffs: curr_objective_coeffs})
-        
+
         self.curr_predictions = predictions[:,:,self.objective_indices]*curr_objective_coeffs[:,None,:]
         self.curr_objectives = np.sum(self.curr_predictions, axis=2)
-        
+
+        print("curr objectives: ", self.curr_objectives)
         curr_action = np.argmax(self.curr_objectives, axis=1)
+        print("Curr action: ", curr_action)
+        # A list containing multiple actions. There are 256 possible actions(see paper) each with their unique index.
         return curr_action
         

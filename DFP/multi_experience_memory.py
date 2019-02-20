@@ -10,11 +10,12 @@ from matplotlib import gridspec
 import time
 import os
 from . import util as my_util
+from cv2 import VideoWriter, VideoWriter_fourcc
 
 class MultiExperienceMemory:
 
     def __init__(self, args, multi_simulator = None, target_maker = None):
-        ''' Initialize emtpy experience dataset. 
+        ''' Initialize emtpy experience dataset.
             Assumptions:
                 - observations come in sequentially, and there is a terminal state in the end of each episode
                 - every episode is shorter than the memory
@@ -26,11 +27,11 @@ class MultiExperienceMemory:
         self.history_step = int(args['history_step'])
         self.shared = args['shared']
         self.obj_shape = args['obj_shape']
-        
+
         self.num_heads = int(multi_simulator.num_simulators)
         self.target_maker = target_maker
         self.head_offset = int(self.capacity/self.num_heads)
-        
+
         self.img_shape = (multi_simulator.num_channels, multi_simulator.resolution[1], multi_simulator.resolution[0])
         self.meas_shape = (multi_simulator.num_meas,)
         self.action_shape = (multi_simulator.action_len,)
@@ -39,7 +40,7 @@ class MultiExperienceMemory:
 
         # initialize dataset
         self.reset()
-        
+
     def reset(self):
         self._images = my_util.make_array(shape=(self.capacity,) + self.img_shape, dtype=np.uint8, shared=self.shared, fill_val=0)
         self._measurements =  my_util.make_array(shape=(self.capacity,) + self.meas_shape, dtype=np.float32, shared=self.shared, fill_val=0.)
@@ -50,21 +51,24 @@ class MultiExperienceMemory:
         self._n_episode = my_util.make_array(shape=(self.capacity,), dtype=np.uint64, shared=self.shared, fill_val=0) # this is needed to compute future targets efficiently
         self._n_head = my_util.make_array(shape=(self.capacity,), dtype=np.uint64, shared=self.shared, fill_val=0) # this is needed to compute future targets efficiently
 
-        self._curr_indices = np.arange(self.num_heads) * int(self.head_offset)
+        self._curr_indices = np.arange(self.num_heads) * int(self.head_offset) #KOE Clever indexing to store N different simulation results at the same time to different parts of an array.
         self._episode_counts = np.zeros(self.num_heads)
 
 
     def add(self, imgs, meass, rwrds, terms, acts, objs=None, preds=None):
-        ''' Add experience to dataset.
+        ''' Add experience to dataset. We generally run N different simulations at the same time, so all variables have N entries.
+        For instance, we here have N imgs from the same timestep at the N different simulations. The clever indexing (curr_indices) takes care to
+        place images from different simulations in different locations.
 
         Args:
-            img: single observation frame           
+            img: single observation frame
             meas: extra measurements from the state
             rwrd: reward
             term: terminal state
             act: action taken
         '''
 
+        print("Adding acted frame to memory. Size: ", len(imgs))
         self._images[self._curr_indices] = imgs
         self._measurements[self._curr_indices] = meass
         self._rewards[self._curr_indices] = rwrds
@@ -94,18 +98,21 @@ class MultiExperienceMemory:
         self._measurements[term_inds[prev_terminals]] = 0.
         # end of hack
         # self._n_episode[term_inds] = self._episode_counts[terminated]+100# so that the terminal step of the episode is not used as a target by target_maker
-        self._n_head[self._curr_indices] = np.arange(self.num_heads)    
-        
+        self._n_head[self._curr_indices] = np.arange(self.num_heads)
+
         self._episode_counts = self._episode_counts + (np.array(terms) == True)
-        self._curr_indices = (self._curr_indices + 1) % self.capacity            
+        self._curr_indices = (self._curr_indices + 1) % self.capacity
         self._terminals[self._curr_indices] = True # make the following state terminal, so that our current episode doesn't get stitched with the next one when sampling states
-            
+
     def add_step(self, multi_simulator, acts = None, objs=None, preds=None):
+        #KOE: Adds one step of experience to dataset, but not adding the actual image observation.
         if acts == None:
             acts = multi_simulator.get_random_actions()
+        #KOE The step method below gets results from all N simulators, appending to our memory.
         self.add(*(multi_simulator.step(acts) +  (acts,objs,preds)))
-        
+
     def add_n_steps_with_actor(self, multi_simulator, num_steps, actor, verbose=False, write_predictions=False, write_logs = False, global_step=0):
+        #KOE The method that actually runs tested agent, and stores experience.
         ns = 0
         last_meas = np.zeros((multi_simulator.num_simulators,) + self.meas_shape)
         if write_predictions and not hasattr(self,'_predictions'):
@@ -137,18 +144,20 @@ class MultiExperienceMemory:
                           ' '.join([('{' + str(n+4) + '}') for n in range(meas_dim)]) + ' | ' + \
                           ' '.join([('{' + str(n+4+meas_dim) + '}') for n in range(meas_dim)]) + '\n'
         for ns in range(int(num_steps)):
+            print("Testing agent step ", ns, " of ", num_steps)
             if verbose and time.time() - start_time > 2:
                 print('%d/%d' % (ns * multi_simulator.num_simulators, num_steps * multi_simulator.num_simulators))
                 start_time = time.time()
 
-            curr_act = actor.act_with_multi_memory(self)
-            
+
+            curr_act = actor.act_with_multi_memory(self) #KOE: Calculates current action with the ANN, getting states from memory.
+
             # actor has to return a np array of bools
             invalid_states = np.logical_not(np.array(self.curr_states_with_valid_history()))
             if actor.random_objective_coeffs:
                 actor.reset_objective_coeffs(np.where(invalid_states)[0].tolist())
             curr_act[invalid_states] = actor.random_actions(np.sum(invalid_states))
-            
+
             if write_predictions:
                 self.add_step(multi_simulator, curr_act.tolist(), actor.objectives_to_write(), actor.curr_predictions)
             else:
@@ -177,7 +186,7 @@ class MultiExperienceMemory:
                     accum_rewards[ns] = 0
                     num_episode_steps[ns] = 0
                     start_times[ns] = time.time()
-        if write_logs:  
+        if write_logs:
             if num_episodes == 0:
                 num_episodes = 1
             log_brief.write(log_brief_format.format(*([global_step, time.time(), time.time() - total_start_time, num_episodes, total_accum_reward/float(num_episodes)] +
@@ -186,52 +195,52 @@ class MultiExperienceMemory:
             log_detailed.close()
 
     def get_states(self, indices):
-        
+
         frames = np.zeros(len(indices)*self.history_length, dtype=np.int64)
         for (ni,index) in enumerate(indices):
             frame_slice = np.arange(int(index) - self.history_length*self.history_step + 1, (int(index) + 1), self.history_step) % self.capacity
             frames[ni*self.history_length:(ni+1)*self.history_length] = frame_slice
-            
+
         state_imgs = np.transpose(np.reshape(np.take(self._images, frames, axis=0), (len(indices),) + self.state_imgs_shape), [0,2,3,1]).astype(np.float32)
         state_meas = np.reshape(np.take(self._measurements, frames, axis=0), (len(indices),) + self.state_meas_shape).astype(np.float32)
         return state_imgs, state_meas
-            
+
     def get_current_state(self):
         '''  Return most recent observation sequence '''
         return self.get_states(list((self._curr_indices-1)%self.capacity))
-    
+
     def get_last_indices(self):
         '''  Return most recent indices '''
         return list((self._curr_indices-1)%self.capacity)
-    
+
     def get_targets(self, indices):
         # TODO this 12345678 is a hack, but should be good enough
-        return self.target_maker.make_targets(indices, self._measurements, self._rewards, self._n_episode + 12345678*self._n_head)      
-    
+        return self.target_maker.make_targets(indices, self._measurements, self._rewards, self._n_episode + 12345678*self._n_head)
+
     def has_valid_history(self, index):
         return (not self._terminals[np.arange(int(index) - self.history_length*self.history_step + 1, int(index)+1) % self.capacity].any())
-    
+
     def curr_states_with_valid_history(self):
         return [self.has_valid_history((ind - 1)%self.capacity) for ind in list(self._curr_indices)]
-    
+
     def has_valid_target(self, index):
         return (not self._terminals[np.arange(index, index+self.target_maker.min_future_frames+1) % self.capacity].any())
-    
+
     def is_valid_state(self, index):
         return self.has_valid_history(index) and self.has_valid_target(index)
-    
+
     def get_observations(self, indices):
         indices_arr = np.array(indices)
         state_imgs, state_meas = self.get_states((indices_arr - 1) % self.capacity)
         rwrds = self._rewards[indices_arr]
-        acts = self._actions[indices_arr]       
+        acts = self._actions[indices_arr]
         terms = self._terminals[indices_arr].astype(int)
         targs = self.get_targets((indices_arr - 1) % self.capacity)
         if isinstance(self._objectives, np.ndarray):
             objs = self._objectives[indices_arr]
         else:
-            objs = None     
-        
+            objs = None
+
         return state_imgs, state_meas, rwrds, terms, acts, targs, objs
 
     def get_random_batch(self, batch_size):
@@ -249,7 +258,7 @@ class MultiExperienceMemory:
 
         # create batch
         return self.get_observations(np.array(samples))
-    
+
     def compute_avg_meas_and_rwrd(self, start_idx, end_idx):
         # compute average measurement values per episode, and average cumulative reward per episode
         curr_num_obs = 0.
@@ -268,20 +277,20 @@ class MultiExperienceMemory:
                 curr_sum_meas = self._measurements[0] * 0
                 curr_sum_rwrd = self._rewards[0] * 0
                 curr_num_obs = 0.
-            else:               
+            else:
                 curr_sum_meas += self._measurements[index]
                 curr_num_obs += 1
-                
+
         if num_episodes == 0.:
             total_avg_meas = curr_sum_meas / curr_num_obs
             total_avg_rwrd = curr_sum_rwrd
         else:
             total_avg_meas = total_sum_meas / num_episodes
             total_avg_rwrd = total_sum_rwrd / num_episodes
-        
+
         return total_avg_meas, total_avg_rwrd
-            
-            
+
+
     def show(self, start_index=0, end_index=None, display=True, write_imgs=False, write_video = False, preprocess_targets=None, show_predictions=0, net_discrete_actions = []):
         if show_predictions:
             assert(hasattr(self,'_predictions'))
@@ -294,7 +303,8 @@ class MultiExperienceMemory:
             prev_time = time.time()
         if write_video:
             print(self.img_shape)
-            vw = VideoWriter('vid.avi', (self.img_shape[2],self.img_shape[1]), framerate=24, rgb=(self.img_shape[0]==3), mode='replace')
+            fourcc = VideoWriter_fourcc(*'XVID')
+            vw = VideoWriter('vid.avi', fourcc, 24, (self.img_shape[2],self.img_shape[1]), self.img_shape[0]==3)
         print('Press ENTER to go to the next observation, type "quit" or "q" or "exit" and press ENTER to quit')
 
         if display or write_imgs:
@@ -307,7 +317,9 @@ class MultiExperienceMemory:
             action_labels = []
             for act in net_discrete_actions:
                 action_labels.append(''.join(str(int(i)) for i in act))
-                
+
+        #Since we usually simulate N different agents at the same time, we have N sets of images that we can show.
+        #This while goes through 1 set first, and if we want to continue, it overwrites the generated video with the next set.
         while True:
             curr_img = np.transpose(self._images[curr_index], (1,2,0))
             if curr_img.shape[2] == 1:
@@ -318,7 +330,7 @@ class MultiExperienceMemory:
                 objs_argsort = np.argsort(-objs)
                 curr_preds = np.transpose(preds[objs_argsort[:show_predictions]])
                 curr_labels = [action_labels[i] for i in objs_argsort[:show_predictions]]
-                
+
             if curr_index == start_index:
                 if display or write_imgs:
                     im = ax_img.imshow(curr_img)
@@ -341,7 +353,7 @@ class MultiExperienceMemory:
                     print('Wrote %d images' % ns)
                     prev_time = time.time()
             if write_video:
-                vw.add_frame(curr_img[:,:,0])
+                vw.write(curr_img[:,:,0])
             if display:
                 fig_img.canvas.draw()
                 if show_predictions:
@@ -352,11 +364,12 @@ class MultiExperienceMemory:
                 print('Action:', self._actions[curr_index])
                 print('Terminal:', self._terminals[curr_index])
                 inp = input()
-                
+
             curr_index = (curr_index + 1) % self.capacity
+
             if curr_index == end_index:
                 if write_video:
-                    vw.close()
+                    vw.release()
                 break
             if inp == 'q' or inp == 'quit' or inp == 'exit':
                 break
