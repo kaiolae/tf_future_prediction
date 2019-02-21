@@ -68,7 +68,7 @@ class MultiExperienceMemory:
             act: action taken
         '''
 
-        print("Adding acted frame to memory. Size: ", len(imgs))
+        #print("Adding acted frame to memory. Size: ", len(imgs))
         self._images[self._curr_indices] = imgs
         self._measurements[self._curr_indices] = meass
         self._rewards[self._curr_indices] = rwrds
@@ -144,7 +144,7 @@ class MultiExperienceMemory:
                           ' '.join([('{' + str(n+4) + '}') for n in range(meas_dim)]) + ' | ' + \
                           ' '.join([('{' + str(n+4+meas_dim) + '}') for n in range(meas_dim)]) + '\n'
         for ns in range(int(num_steps)):
-            print("Testing agent step ", ns, " of ", num_steps)
+            #print("Testing agent step ", ns, " of ", num_steps)
             if verbose and time.time() - start_time > 2:
                 print('%d/%d' % (ns * multi_simulator.num_simulators, num_steps * multi_simulator.num_simulators))
                 start_time = time.time()

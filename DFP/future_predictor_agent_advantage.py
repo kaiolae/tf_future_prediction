@@ -87,8 +87,8 @@ class FuturePredictorAgentAdvantage(Agent):
         else:
             curr_objective_coeffs = objective_coeffs
 
-        print("**************Calculating action.******************")
-        print("Input objectives: ", curr_objective_coeffs)
+        #print("**************Calculating action.******************")
+        #print("Input objectives: ", curr_objective_coeffs)
 
         predictions = self.sess.run(self.pred_all, feed_dict={self.input_images: state_imgs,
                                                               self.input_measurements: state_meas,
@@ -97,9 +97,9 @@ class FuturePredictorAgentAdvantage(Agent):
         self.curr_predictions = predictions[:,:,self.objective_indices]*curr_objective_coeffs[:,None,:]
         self.curr_objectives = np.sum(self.curr_predictions, axis=2)
 
-        print("curr objectives: ", self.curr_objectives)
+        #print("curr objectives: ", self.curr_objectives)
         curr_action = np.argmax(self.curr_objectives, axis=1)
-        print("Curr action: ", curr_action)
+        #print("Curr action: ", curr_action)
         # A list containing multiple actions. There are 256 possible actions(see paper) each with their unique index.
         return curr_action
         

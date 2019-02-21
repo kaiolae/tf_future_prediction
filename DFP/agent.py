@@ -226,8 +226,8 @@ class Agent:
     class Actor:
         # a small interface which will actually be used for taking actions
         def __init__(self, agent, objective_coeffs, random_prob, random_objective_coeffs):
-            if objective_coeffs is None:
-                assert(random_prob == 1.)
+            #if objective_coeffs is None:
+            #    assert(random_prob == 1.) KOE: Removed assert, since we do want this when evolving objectives.
             self.agent = agent
             self.random_objective_coeffs = random_objective_coeffs
             if self.random_objective_coeffs:
@@ -282,6 +282,20 @@ class Agent:
                 curr_act = self.agent.act(state_imgs, state_meas, self.objective_coeffs)
                 self.curr_predictions = self.agent.curr_predictions
             return curr_act
+
+
+        def act_with_evolved_objectives(self, multi_memory, evolved_ann):
+            assert(self.objective_coeffs == None) #They should not be set when evolving adaptive coeffs.
+            state_imgs, state_meas = multi_memory.get_current_state()
+            print("Meas in current state are: ", state_meas)
+            adaptive_measurement_objectives = evolved_ann.activate(state_meas)
+            #TODO Are these the coeffs that are actually used by the NN? Check the inputs.
+            _, adaptive_coeffs = my_util.make_objective_indices_and_coeffs(self.objective_coeffs_temporal, #TODO Not allowing evolution to set these yet. Maybe later.
+                                                                                 adaptive_measurement_objectives)
+            curr_act = self.agent.act(state_imgs, state_meas, adaptive_coeffs) #Acting with NN-generated coeffs.
+            print("Acting with evolved coeffs: ", adaptive_coeffs)
+            self.curr_predictions = self.agent.curr_predictions
+            return curr_act
         
         def random_actions(self, num_samples):
             return self.agent.random_actions(num_samples)
@@ -324,7 +338,8 @@ class Agent:
             
         self.curr_step += 1
         
-        
+
+    #KOE: Not updating training-code with adaptive objectives. Should be enough to have this in the testing-code.
     def train(self, simulator, experience, num_steps, test_policy_experience=None):
         # load the model if available and initialize variables
         if self.init_model:
@@ -388,10 +403,43 @@ class Agent:
             #self.writer.add_summary(tf_avg_rwrd_summary[0], self.curr_step)
             
         experience.head_offset = old_head_offset
-        return None
+        return total_avg_meas, total_avg_rwrd
 
-    
-    def save(self, checkpoint_dir, step):       
+    def test_policy_with_evolved_NEAT_objectives(self, simulator, experience, evolved_nn, num_steps, random_prob=0.,
+                                                 write_summary=False,
+                                                 write_predictions=False):
+        print('== Testing the policy ==')
+        old_head_offset = experience.head_offset
+        experience.head_offset = num_steps + 1
+        experience.reset()
+        actor = self.get_actor(objective_coeffs=objective_coeffs, random_prob=random_prob,
+                               random_objective_coeffs=False)
+        # The steps that performs actions, and stores everything it sees into simulator.
+        experience.add_n_steps_with_actor(simulator, num_steps, actor, verbose=True,
+                                          write_predictions=write_predictions, write_logs=True,
+                                          global_step=self.curr_step * self.batch_size, evolved_ann=evolved_nn)
+        # Calculates average measurements and rewards for this agent. KOE: Should be useful for tests!
+        total_avg_meas, total_avg_rwrd = experience.compute_avg_meas_and_rwrd(0, num_steps * simulator.num_simulators)
+        print('Average mean measurements  per episode:', total_avg_meas, '\nAverage reward per episode:',
+              total_avg_rwrd)
+
+        if write_summary:
+            pass
+        # TODO
+        # tf_avg_meas = tf.placeholder(tf.float32, total_avg_meas.shape)
+        # tf_avg_meas_sum = tf.summary.merge([tf.summary.scalar("test_avg_" + tag, tf_avg_meas) for tag,meas in simulator.simulators[0].meas_tags
+        # tf_avg_meas_summary = self.sess.run([tf_avg_meas_sum], feed_dict = {tf_avg_meas: total_avg_meas})
+        # self.writer.add_summary(tf_avg_meas_summary[0], self.curr_step)
+
+        # tf_avg_rwrd = tf.placeholder(tf.float32, total_avg_rwrd.shape)
+        # tf_avg_rwrd_sum = tf.summary.scalar("test_avg_rwrd", tf_avg_rwrd)
+        # tf_avg_rwrd_summary = self.sess.run([tf_avg_rwrd_sum], feed_dict = {tf_avg_rwrd: total_avg_rwrd})
+        # self.writer.add_summary(tf_avg_rwrd_summary[0], self.curr_step)
+
+        experience.head_offset = old_head_offset
+        return total_avg_meas, total_avg_rwrd
+
+    def save(self, checkpoint_dir, step):
         checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
 
         if not os.path.exists(checkpoint_dir):
