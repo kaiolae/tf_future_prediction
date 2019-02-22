@@ -1,7 +1,7 @@
 # Config file for NEAT-Python
 
 [NEAT]
-pop_size              = 2
+pop_size              = 50
 # Note: the fitness threshold will never be reached because
 # we are controlling the termination ourselves
 fitness_criterion     = max

@@ -177,8 +177,8 @@ def run_neat(config_file):
 	p.add_reporter(stats)
 	p.add_reporter(neat.Checkpointer(5))
 
-	# Run for up to 300 generations.
-	winner = p.run(eval_genomes, 3) #TODO#300) pop size 25
+	# 50 indivs seems to give 15 min per generation. 100 gen in 1 day, 250 in a weekend run.
+	winner = p.run(eval_genomes, 250) #TODO#300) pop size 25
 
 	# Display the winning genome.
 	print('\nBest genome:\n{!s}'.format(winner))
