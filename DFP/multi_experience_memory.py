@@ -111,7 +111,7 @@ class MultiExperienceMemory:
         #KOE The step method below gets results from all N simulators, appending to our memory.
         self.add(*(multi_simulator.step(acts) +  (acts,objs,preds)))
 
-    def add_n_steps_with_actor(self, multi_simulator, num_steps, actor, verbose=False, write_predictions=False, write_logs = False, global_step=0):
+    def add_n_steps_with_actor(self, multi_simulator, num_steps, actor, verbose=False, write_predictions=False, write_logs = False, global_step=0, evolved_ann = None):
         #KOE The method that actually runs tested agent, and stores experience.
         ns = 0
         last_meas = np.zeros((multi_simulator.num_simulators,) + self.meas_shape)
@@ -149,9 +149,11 @@ class MultiExperienceMemory:
                 print('%d/%d' % (ns * multi_simulator.num_simulators, num_steps * multi_simulator.num_simulators))
                 start_time = time.time()
 
-
-            curr_act = actor.act_with_multi_memory(self) #KOE: Calculates current action with the ANN, getting states from memory.
-
+            #KOEChange
+            if not evolved_ann:
+                curr_act = actor.act_with_multi_memory(self) #KOE: The original code. Calculates current action with the ANN, getting states from memory.
+            else:
+                curr_act = actor.act_with_evolved_objectives(self, evolved_ann)
             # actor has to return a np array of bools
             invalid_states = np.logical_not(np.array(self.curr_states_with_valid_history()))
             if actor.random_objective_coeffs:

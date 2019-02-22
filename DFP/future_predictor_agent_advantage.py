@@ -102,4 +102,27 @@ class FuturePredictorAgentAdvantage(Agent):
         #print("Curr action: ", curr_action)
         # A list containing multiple actions. There are 256 possible actions(see paper) each with their unique index.
         return curr_action
+
+    #KOETODO Should be right, but may need to double check just how those multiple coeffs are processed by the NN.
+    def act_net_evolved(self, state_imgs, state_meas, objective_coeffs):
+        #Same as act_net above, except we use evolved objective-coeffs. These are different for all 8 simulator-instanciations,
+        #since the objectives depend on current state. So, instead of replicating 1 objective-coeffs, we use 8 independent ones.
+        curr_objective_coeffs = objective_coeffs
+        #print("Act net evolved with objectives ", curr_objective_coeffs)
+
+        #print("**************Calculating action.******************")
+        #print("Input objectives: ", curr_objective_coeffs)
+
+        predictions = self.sess.run(self.pred_all, feed_dict={self.input_images: state_imgs,
+                                                              self.input_measurements: state_meas,
+                                                              self.input_objective_coeffs: curr_objective_coeffs})
+
+        self.curr_predictions = predictions[:,:,self.objective_indices]*curr_objective_coeffs[:,None,:]
+        self.curr_objectives = np.sum(self.curr_predictions, axis=2)
+
+        #print("curr objectives: ", self.curr_objectives)
+        curr_action = np.argmax(self.curr_objectives, axis=1)
+        #print("Curr action: ", curr_action)
+        # A list containing multiple actions. There are 256 possible actions(see paper) each with their unique index.
+        return curr_action
         

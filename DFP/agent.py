@@ -39,15 +39,15 @@ class Agent:
         self.postprocess_predictions = args['postprocess_predictions']
         
         # agent properties
-        self.objective_coeffs_temporal = args['objective_coeffs_temporal']
-        self.objective_coeffs_meas = args['objective_coeffs_meas']
+        self.objective_coeffs_temporal = args['objective_coeffs_temporal'] #The temporal coeffs
+        print("*************TEMPORAL COEFFS SET TO ", self.objective_coeffs_temporal,"***********************'")
+        self.objective_coeffs_meas = args['objective_coeffs_meas'] #The meas coeffs - None if we are evolving an ANN for generating these.
+        self.objective_coeffs = args['objective_coeffs'] #The combined temporal and meas coeffs
         self.objective_indices = args['objective_indices']
-        self.objective_coeffs = args['objective_coeffs']
         self.random_exploration_schedule = args['random_exploration_schedule']
         self.new_memories_per_batch = args['new_memories_per_batch']
         self.add_experiences_every = args['add_experiences_every']
         self.random_objective_coeffs = args['random_objective_coeffs']
-        self.objective_coeffs_temporal = args['objective_coeffs_temporal']
         self.objective_coeffs_distribution = args['objective_coeffs_distribution']
         
         # net parameters
@@ -86,11 +86,16 @@ class Agent:
         
         if self.reset_iter_count or (not self.set_init_step(self.init_model)):
             self.curr_step = 0
+
+        self.objective_coeffs_log = [] #Evolved individuals get these values logged, so we can plot them later. TODO: Also log NN inputs!
         
         self.curr_objectives = None
         self.curr_predictions = None
             
-        self.build_model()      
+        self.build_model()
+
+    def reset_evo_logs(self):
+        self.objective_coeffs_log = []
         
     def prepare_controls_and_actions(self):
         # generate the list of available actions
@@ -216,6 +221,11 @@ class Agent:
     
     def act(self, state_imgs, state_meas, objective_coeffs):
         return self.postprocess_actions(self.act_net(state_imgs, state_meas[:,self.meas_for_net], objective_coeffs), self.act_manual(state_meas[:,self.meas_for_manual]))
+
+    def act_evolved(self, state_imgs, state_meas, objective_coeffs):
+        return self.postprocess_actions(self.act_net_evolved(state_imgs, state_meas[:,self.meas_for_net], objective_coeffs), self.act_manual(state_meas[:,self.meas_for_manual]))
+
+
     
     def act_net(self, state_imgs, state_meas, objective_coeffs):
         raise NotImplementedError( "Agent should implement act_net, which takes the input state and outputs an action" )
@@ -285,15 +295,24 @@ class Agent:
 
 
         def act_with_evolved_objectives(self, multi_memory, evolved_ann):
-            assert(self.objective_coeffs == None) #They should not be set when evolving adaptive coeffs.
+            #Not using the pre-set (dummy) meas-objectives.
+            #TODO: Meas have the values for all 8 sims. How to get current?
             state_imgs, state_meas = multi_memory.get_current_state()
-            print("Meas in current state are: ", state_meas)
-            adaptive_measurement_objectives = evolved_ann.activate(state_meas)
-            #TODO Are these the coeffs that are actually used by the NN? Check the inputs.
-            _, adaptive_coeffs = my_util.make_objective_indices_and_coeffs(self.objective_coeffs_temporal, #TODO Not allowing evolution to set these yet. Maybe later.
-                                                                                 adaptive_measurement_objectives)
-            curr_act = self.agent.act(state_imgs, state_meas, adaptive_coeffs) #Acting with NN-generated coeffs.
-            print("Acting with evolved coeffs: ", adaptive_coeffs)
+            #We get N (# of diff. simulator instantiations) different meas-vectors. Run each through NN, and send the whole
+            #resulting matrix of objectives to act-function.
+            adaptive_coeffs = []
+            for state_meas_vector in state_meas:
+                #print("ANN inputs: ", state_meas_vector)
+                objectives_vector = evolved_ann.activate(state_meas_vector)
+                self.agent.objective_coeffs_log.append(objectives_vector)
+                #print("ANN outputs (=objective_meas weights)", objectives_vector)
+                _ ,adaptive_coeffs_vector = my_util.make_objective_indices_and_coeffs(self.agent.objective_coeffs_temporal, objectives_vector) #TODO: Check just what those indices do.
+                adaptive_coeffs.append(adaptive_coeffs_vector)
+
+            #print("Resulting objective matrix (1 row per sim-instantiation) is: ", adaptive_coeffs) #TODO Check print
+            adaptive_coeffs=np.array(adaptive_coeffs)
+
+            curr_act = self.agent.act_evolved(state_imgs, state_meas, adaptive_coeffs) #Acting with NN-generated coeffs.
             self.curr_predictions = self.agent.curr_predictions
             return curr_act
         
@@ -412,7 +431,7 @@ class Agent:
         old_head_offset = experience.head_offset
         experience.head_offset = num_steps + 1
         experience.reset()
-        actor = self.get_actor(objective_coeffs=objective_coeffs, random_prob=random_prob,
+        actor = self.get_actor(objective_coeffs=None, random_prob=random_prob,
                                random_objective_coeffs=False)
         # The steps that performs actions, and stores everything it sees into simulator.
         experience.add_n_steps_with_actor(simulator, num_steps, actor, verbose=True,

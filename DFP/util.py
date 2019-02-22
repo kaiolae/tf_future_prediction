@@ -7,8 +7,13 @@ import matplotlib.pyplot as plt
 import json
 
 def make_objective_indices_and_coeffs(temporal_coeffs, meas_coeffs):
+    meas_coeffs=np.array(meas_coeffs)
+    meas_coeffs[meas_coeffs==0]=0.001 #KOE: Zero-values give missing coeffs - replacing with small positive val.
     objective_coeffs = (np.reshape(temporal_coeffs, (1,-1)) * np.reshape(meas_coeffs, (-1,1))).flatten()
+    #print("flattened coeffs are ", objective_coeffs)
     objective_indices = np.where(np.abs(objective_coeffs) > 1e-8)[0]
+    #The coeffs and indices are now ordered as follows:
+    #[timestep1-meas1, timestep2-meas1, ... timestepn-meas1, timestep1-meas2, ..., timestepn-meas2, ...]
     return objective_indices, objective_coeffs[objective_indices]
 
 def make_array(shape=(1,), dtype=np.float32, shared=False, fill_val=None):  

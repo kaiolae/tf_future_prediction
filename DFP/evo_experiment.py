@@ -62,6 +62,7 @@ class EvoExperiment:
 
         agent_args['objective_indices'], agent_args['objective_coeffs'] = my_util.make_objective_indices_and_coeffs(agent_args['objective_coeffs_temporal'],
                                                                                                                     agent_args['objective_coeffs_meas'])
+        print("original obj indices: ", agent_args['objective_indices'])
 
         train_experience_args['obj_shape'] = (len(agent_args['objective_coeffs']),)
         test_policy_experience_args['obj_shape'] = (len(agent_args['objective_coeffs']),)
@@ -117,7 +118,7 @@ class EvoExperiment:
 
     #TODO: I think the arguments here should be experiment_args['test_objective_coeffs_temporal'], experiment_args['test_objective_coeffs_meas']
     #TODO Consider letting the evolved NN also decide the temporal weights.
-    def test_new_individual(self, temporal_objective_weights, evolved_nn):
+    def test_new_individual(self, evolved_nn):
         #TODO: Take this into the decision-step. _, test_objective_coeffs = my_util.make_objective_indices_and_coeffs(temporal_objective_weights, measurement_objective_weights)
         # Since we run N different simulations at the same time, we want to offset their stored data (with N different "write heads") spaced apart by the length of the planned episode.
         self.train_experience.head_offset = self.test_policy_num_steps + 1
@@ -129,7 +130,9 @@ class EvoExperiment:
         #                    self.test_policy_num_steps, write_summary=False,
         #                    write_predictions=False) #Don't want to write for every agent, but will need some external checkpointing later.
         #My own test policy method that allows adaptive objectives.
-        avg_measurements, avg_rewards = self.ag.test_policy_with_evolved_NEAT_objectives(self.multi_simulator, self.train_experience, test_objective_coeffs, evolved_nn,
+
+        self.ag.reset_evo_logs() #Resets the things we are logging for evolution, so we get fresh logs for next agent.
+        avg_measurements, avg_rewards = self.ag.test_policy_with_evolved_NEAT_objectives(self.multi_simulator, self.train_experience, evolved_nn,
                             self.test_policy_num_steps, write_summary=False,
                             write_predictions=False)
 
