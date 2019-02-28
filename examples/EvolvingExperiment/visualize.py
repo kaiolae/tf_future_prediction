@@ -1,6 +1,8 @@
 #Visualizing EA results
 import copy
 import warnings
+import matplotlib as mpl
+mpl.use('Agg') #This will allow plotting without access to display (e.g. in disconnected screen session)
 import matplotlib.pyplot as plt
 import numpy as np
 

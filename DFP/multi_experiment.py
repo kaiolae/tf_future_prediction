@@ -111,26 +111,29 @@ class MultiExperiment:
     def run(self, mode):
         #KOE: The main run-method, that can either train a new agent, or show the performance of a trained agent.
         shutil.copy('run_exp.py', 'run_exp.py.' + mode)
-        if mode == 'show':
-            #KOE: Shows performance of trained agent.
-            if not self.ag.load(self.test_checkpoint):
-                print('Could not load the checkpoint ', self.test_checkpoint)
-                return
-            #Since we run N different simulations at the same time, we want to offset their stored data (with N different "write heads") spaced apart by the length of the planned episode.
-            self.train_experience.head_offset = self.test_policy_num_steps + 1
-            self.train_experience.log_prefix = 'logs/log_test'
-            #KOE: Tests the trained policy represented by stored weights, with given objectives. Results are remembered, and plotted by the method below.
-            self.ag.test_policy(self.multi_simulator, self.train_experience, self.test_objective_coeffs, self.test_policy_num_steps, random_prob = self.test_random_prob, write_summary=False, write_predictions=True)
-            # KoeChange: WriteVideo
-            # Shows/Stores the experience of the tested agent above.
-            #KOETODO What does num_simulators do?
+        #if mode == 'show':
+        #KOE: Shows performance of trained agent.
+        if not self.ag.load(self.test_checkpoint):
+            print('Could not load the checkpoint ', self.test_checkpoint)
+            return
+        #Since we run N different simulations at the same time, we want to offset their stored data (with N different "write heads") spaced apart by the length of the planned episode.
+        self.train_experience.head_offset = self.test_policy_num_steps + 1
+        self.train_experience.log_prefix = 'logs/log_test'
+        #KOE: Tests the trained policy represented by stored weights, with given objectives. Results are remembered, and plotted by the method below.
+        avg_meas, avg_reward = self.ag.test_policy(self.multi_simulator, self.train_experience, self.test_objective_coeffs, self.test_policy_num_steps, random_prob = self.test_random_prob, write_summary=False, write_predictions=True)
+        # KoeChange: WriteVideo
+        # Shows/Stores the experience of the tested agent above.
+        #KOETODO What does num_simulators do?
+        if "show" in mode:
             self.train_experience.show(start_index=0, end_index=self.test_policy_num_steps * self.multi_simulator.num_simulators, display=False, write_imgs=False,  write_video=True,
                                        preprocess_targets = self.ag.preprocess_input_targets, show_predictions=self.num_predictions_to_show, net_discrete_actions = self.ag.net_discrete_actions)
-        elif mode == 'train':
-            self.test_policy_experience.log_prefix = 'logs/log'
-            self.ag.train(self.multi_simulator, self.train_experience, self.num_train_iterations, test_policy_experience=self.test_policy_experience)
-        else:
-            print('Unknown mode', mode)
+
+        return avg_meas, avg_reward
+        #elif mode == 'train':
+        #    self.test_policy_experience.log_prefix = 'logs/log'
+        #    self.ag.train(self.multi_simulator, self.train_experience, self.num_train_iterations, test_policy_experience=self.test_policy_experience)
+        #else:
+        #    print('Unknown mode', mode)
         
         
         

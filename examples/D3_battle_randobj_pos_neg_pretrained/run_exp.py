@@ -27,7 +27,7 @@ def main(main_args):
 	simulator_args['maps'] = ['MAP01']
 	simulator_args['switch_maps'] = False
 	#train
-	simulator_args['num_simulators'] = 8
+	simulator_args['num_simulators'] = 8 #TODO Set back to 8, just testing something. 8
 	
 	## Experience
 	# Train experience
@@ -130,9 +130,29 @@ def main(main_args):
 							agent_args=agent_args,
 							experiment_args=experiment_args)
 	
-	experiment.run(main_args[0])
+	return experiment.run(main_args[0])
 	
 	
 
 if __name__ == '__main__':
-	main(sys.argv[1:])
+	# Show: stores exp to video. Stat: Store avg fitnesses and meas.
+	mode=sys.argv[1:]
+	print("*****************MODE IS ", mode, "*****************")
+	if "stat" in mode:
+		print("Statistics mode")
+		avg_meas_vector = []
+		avg_reward_vector = []
+		avg_meas, avg_reward = main(mode)
+		avg_meas_vector.append(avg_meas)
+		avg_reward_vector.append(avg_reward)
+		avg_meas_vector=np.array(avg_meas_vector)
+		avg_reward_vector=np.array(avg_reward_vector)
+
+		f1 = open('reward_stats.csv', 'a')
+		np.savetxt(f1, avg_reward_vector, delimiter=" ")
+		f2 = open('meas_stats.csv', 'a')
+		np.savetxt(f2, avg_meas_vector, delimiter=" ")
+	else:
+		print("Show mode")
+		main(mode)
+

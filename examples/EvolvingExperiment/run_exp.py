@@ -178,7 +178,7 @@ def run_neat(config_file):
 	p.add_reporter(neat.Checkpointer(5))
 
 	# 50 indivs seems to give 15 min per generation. 100 gen in 1 day, 250 in a weekend run.
-	winner = p.run(eval_genomes, 250) #TODO#300) pop size 25
+	winner = p.run(eval_genomes, 100) #TODO#300) pop size 25
 
 	# Display the winning genome.
 	print('\nBest genome:\n{!s}'.format(winner))
@@ -188,8 +188,9 @@ def run_neat(config_file):
 	print('\nOutput:')
 	winner_net = neat.nn.FeedForwardNetwork.create(winner, config)
 
-	visualize.plot_stats(stats, ylog=False, view=False)
+
 	stats.save_genome_fitness()
+	visualize.plot_stats(stats, ylog=False, view=False)
 	#visualize.plot_species(stats, view=True)
 
 if __name__ == '__main__':
