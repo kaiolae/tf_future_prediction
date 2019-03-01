@@ -118,7 +118,7 @@ class EvoExperiment:
 
     #TODO: I think the arguments here should be experiment_args['test_objective_coeffs_temporal'], experiment_args['test_objective_coeffs_meas']
     #TODO Consider letting the evolved NN also decide the temporal weights.
-    def test_new_individual(self, evolved_nn):
+    def test_new_individual(self, evolved_nn, store_to_video = False):
         #TODO: Take this into the decision-step. _, test_objective_coeffs = my_util.make_objective_indices_and_coeffs(temporal_objective_weights, measurement_objective_weights)
         # Since we run N different simulations at the same time, we want to offset their stored data (with N different "write heads") spaced apart by the length of the planned episode.
         self.train_experience.head_offset = self.test_policy_num_steps + 1
@@ -135,7 +135,13 @@ class EvoExperiment:
         avg_measurements, avg_rewards = self.ag.test_policy_with_evolved_NEAT_objectives(self.multi_simulator, self.train_experience, evolved_nn,
                             self.test_policy_num_steps, write_summary=False,
                             write_predictions=False)
-
+        if store_to_video:
+            self.train_experience.show(start_index=0,
+                                       end_index=self.test_policy_num_steps * self.multi_simulator.num_simulators,
+                                       display=False, write_imgs=False, write_video=True,
+                                       preprocess_targets=self.ag.preprocess_input_targets,
+                                       show_predictions=0,#KOEChange:self.num_predictions_to_show,
+                                       net_discrete_actions=self.ag.net_discrete_actions)
         #KOETODO: Can I just skip the "show" here?
         print("Eval done. Avg meas: ", avg_measurements)
         print("Eval done. Avg reward: ", avg_rewards)

@@ -8,6 +8,7 @@ import neat
 import visualize
 import pickle
 from neat.six_util import itervalues, iterkeys
+import os
 
 def main(doom_config_file):
 	

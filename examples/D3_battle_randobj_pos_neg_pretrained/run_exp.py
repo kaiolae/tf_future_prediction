@@ -4,8 +4,8 @@ sys.path = ['../..'] + sys.path
 from DFP.multi_experiment import MultiExperiment
 import numpy as np
 import time
-
-def main(main_args):
+import os
+def main(mode, doom_config_file):
 	
 	### Set all arguments
 	
@@ -20,7 +20,7 @@ def main(main_args):
 	
 	## Simulator
 	simulator_args = {}
-	simulator_args['config'] = '../../maps/D3_battle.cfg'
+	simulator_args['config'] = '../../maps/'+doom_config_file#D3_battle.cfg'
 	simulator_args['resolution'] = (84,84)
 	simulator_args['frame_skip'] = 1#4 #TODO Change back to 4 for experiements. 1 helps get nicer videos though.
 	simulator_args['color_mode'] = 'GRAY'	
@@ -130,29 +130,39 @@ def main(main_args):
 							agent_args=agent_args,
 							experiment_args=experiment_args)
 	
-	return experiment.run(main_args[0])
+	return experiment.run(mode)
 	
 	
 
 if __name__ == '__main__':
 	# Show: stores exp to video. Stat: Store avg fitnesses and meas.
-	mode=sys.argv[1:]
+	mode=sys.argv[1]
+
+	doom_config_file = sys.argv[2]
+	if len(sys.argv) > 3:
+		store_to_folder = sys.argv[3]
+	else:
+		store_to_folder = doom_config_file[:-4]
+	print("***************Storing results to folder ", store_to_folder, "*********************************")
+	if not os.path.exists(store_to_folder):
+		os.makedirs(store_to_folder)
+
 	print("*****************MODE IS ", mode, "*****************")
 	if "stat" in mode:
 		print("Statistics mode")
 		avg_meas_vector = []
 		avg_reward_vector = []
-		avg_meas, avg_reward = main(mode)
+		avg_meas, avg_reward = main(mode, doom_config_file)
 		avg_meas_vector.append(avg_meas)
 		avg_reward_vector.append(avg_reward)
 		avg_meas_vector=np.array(avg_meas_vector)
 		avg_reward_vector=np.array(avg_reward_vector)
 
-		f1 = open('reward_stats.csv', 'a')
+		f1 = open(store_to_folder+'/reward_stats.csv', 'a+')
 		np.savetxt(f1, avg_reward_vector, delimiter=" ")
-		f2 = open('meas_stats.csv', 'a')
+		f2 = open(store_to_folder+'/meas_stats.csv', 'a+')
 		np.savetxt(f2, avg_meas_vector, delimiter=" ")
 	else:
 		print("Show mode")
-		main(mode)
+		main(mode, doom_config_file)
 

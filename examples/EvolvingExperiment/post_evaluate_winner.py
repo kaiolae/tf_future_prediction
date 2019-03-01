@@ -144,7 +144,7 @@ def store_individual_fitness(genome):
     avg_reward_vector = []
     avg_reward_vector.append(fitness)
     avg_reward_vector = np.array(avg_reward_vector)
-    f1 = open('reward_stats_with_evolved_nn.csv', 'a')
+    f1 = open('reward_stats_with_evolved_nn.csv', 'a+')
     np.savetxt(f1, avg_reward_vector, delimiter=" ")
 
 def store_individual_behavior(genome):

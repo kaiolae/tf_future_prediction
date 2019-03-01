@@ -10,8 +10,9 @@ import time
 import neat
 import visualize
 import pickle
+import os
 
-def main():
+def main(doom_scenario):
 	
 	### Set all arguments
 	
@@ -26,7 +27,7 @@ def main():
 	
 	## Simulator
 	simulator_args = {}
-	simulator_args['config'] = '../../maps/D3_battle.cfg'
+	simulator_args['config'] = '../../maps/'+doom_scenario#D3_battle.cfg'
 	simulator_args['resolution'] = (84,84)
 	simulator_args['frame_skip'] = 4#4
 	simulator_args['color_mode'] = 'GRAY'	
@@ -168,15 +169,25 @@ class dummyAnnRules:
 			return [0.5,0.5,1.0]
 
 if __name__ == '__main__':
+	global store_to_folder
+	doom_scenario = sys.argv[1]
+	if len(sys.argv) > 2:
+		store_to_folder = sys.argv[2]
+	else:
+		store_to_folder = doom_scenario[:-4]
+	print("***************Storing results to folder ", store_to_folder, "*********************************")
+	if not os.path.exists(store_to_folder):
+		os.makedirs(store_to_folder)
+
 	#Configuring the Deep NN experiment
-	experiment_interface = main()
+	experiment_interface = main(doom_scenario)
 	dummyAnn = dummyAnnRules()
 
 	avg_reward_vector = []
 	avg_reward = experiment_interface.test_new_individual(dummyAnn)
 	avg_reward_vector.append(avg_reward)
 	avg_reward_vector = np.array(avg_reward_vector)
-	f1 = open('reward_stats_with_dummy_rules.csv', 'a')
+	f1 = open(store_to_folder+'/reward_stats_with_dummy_rules.csv', 'a+')
 	np.savetxt(f1, avg_reward_vector, delimiter=" ")
 
 
