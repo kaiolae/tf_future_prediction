@@ -89,6 +89,7 @@ class FuturePredictorAgentAdvantage(Agent):
 
         #print("**************Calculating action.******************")
         #print("Input objectives: ", curr_objective_coeffs)
+        #print("Current meas: ", state_meas[0])
 
         predictions = self.sess.run(self.pred_all, feed_dict={self.input_images: state_imgs,
                                                               self.input_measurements: state_meas,

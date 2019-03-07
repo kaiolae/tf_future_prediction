@@ -18,7 +18,7 @@ import cv2
 
 class DoomSimulator:
     
-    def __init__(self, args):        
+    def __init__(self, args, my_id):
         self.config = args['config']
         self.resolution = args['resolution']
         self.frame_skip = args['frame_skip']
@@ -26,6 +26,9 @@ class DoomSimulator:
         self.switch_maps = args['switch_maps']
         self.maps = args['maps']
         self.game_args = args['game_args']
+        self.record_to_file = args['record_to_file']
+
+        self.my_id = my_id
         
         self._game = vizdoom.DoomGame()
         self._game.set_vizdoom_path(os.path.join(vizdoom_path,'vizdoom'))
@@ -81,6 +84,10 @@ class DoomSimulator:
         if not self.game_initialized:
             self._game.init()
             self.game_initialized = True
+            if self.record_to_file:
+                filename = self.record_to_file+str(self.my_id)+".lmp"
+                print("filename is ", filename)
+                self._game.new_episode(filename)
             
     def close_game(self):
         if self.game_initialized:
@@ -101,7 +108,9 @@ class DoomSimulator:
         """
         self.init_game()
         
-        rwrd = self._game.make_action(action, self.frame_skip)        
+        rwrd = self._game.make_action(action, self.frame_skip)
+        #if rwrd!=0:
+        #    print("Reward ", rwrd)
         state = self._game.get_state()
         
         if state is None:

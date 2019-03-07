@@ -10,9 +10,11 @@ class MultiDoomSimulator:
 		
 		self.num_simulators = len(all_args)
 		self.simulators = []
+		sim_counter = 0
 		for args in all_args:
 			print("***************INSTANTIATING A SIMULATOR***************************'")
-			self.simulators.append(DoomSimulator(args))
+			self.simulators.append(DoomSimulator(args, my_id=sim_counter))
+			sim_counter+=1
 			
 		self.resolution = self.simulators[0].resolution
 		self.num_channels = self.simulators[0].num_channels
