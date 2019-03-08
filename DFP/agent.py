@@ -50,6 +50,9 @@ class Agent:
         self.add_experiences_every = args['add_experiences_every']
         self.random_objective_coeffs = args['random_objective_coeffs']
         self.objective_coeffs_distribution = args['objective_coeffs_distribution']
+        if args['store_experience_and_objective_values'] == True:
+            self.objectives_history = []
+            self.store_objectives_to_history = True
         
         # net parameters
         self.conv_params = args['conv_params']

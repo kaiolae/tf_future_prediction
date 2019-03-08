@@ -37,6 +37,8 @@ class DoomSimulator:
         self._game.add_game_args(self.game_args)
         self.curr_map = 0
         self._game.set_doom_map(self.maps[self.curr_map])
+
+        self.num_deaths = 0
         
         # set resolution
         try:
@@ -142,6 +144,7 @@ class DoomSimulator:
         term = self._game.is_episode_finished() or self._game.is_player_dead()
         
         if term:
+            self.num_deaths+=1
             self.new_episode() # in multiplayer multi_simulator takes care of this            
             img = np.zeros((self.num_channels, self.resolution[1], self.resolution[0]), dtype=np.uint8) # should ideally put nan here, but since it's an int...
             meas = np.zeros(self.num_meas, dtype=np.uint32) # should ideally put nan here, but since it's an int...
@@ -164,4 +167,9 @@ class DoomSimulator:
     def new_episode(self):
         self.next_map()
         self.episode_count += 1
-        self._game.new_episode()
+        if self.record_to_file:
+            filename = self.record_to_file + str(self.my_id) + "_" + str(self.num_deaths)+ ".lmp"
+            print("filename is ", filename)
+            self._game.new_episode(filename)
+        else:
+            self._game.new_episode()

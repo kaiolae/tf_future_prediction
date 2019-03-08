@@ -145,6 +145,19 @@ class EvoExperiment:
         #KOETODO: Can I just skip the "show" here?
         print("Eval done. Avg meas: ", avg_measurements)
         print("Eval done. Avg reward: ", avg_rewards)
+
+        #Storing agent history and objective values if requested.
+        if self.ag.store_objectives_to_history:
+            #TODO: Enable to store to any file later.
+            obj_hist = np.array(self.ag.objectives_history) #1 row per timestep. Inside each there are 8(num_simulators) tuples of coeffs.
+            print("obj hist shape is ", obj_hist.shape)
+            for i in range(self.ag.num_simulators):
+                obj_hist_file = "objectives_history" + str(i) +".csv"
+                my_history = obj_hist[:,i,:]
+                np.savetxt(obj_hist_file, my_history, delimiter=" ")
+
+        self.multi_simulator.close_games()
+
         return avg_rewards #Fitness?
 
     '''

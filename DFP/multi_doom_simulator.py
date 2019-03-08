@@ -61,3 +61,7 @@ class MultiDoomSimulator:
 		for sim in self.simulators:
 			acts.append(sim.get_random_action())
 		return acts
+
+	def close_games(self):
+		for sim in self.simulators:
+			sim.close_game()

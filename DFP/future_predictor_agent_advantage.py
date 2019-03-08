@@ -12,7 +12,7 @@ from .agent import Agent
 
 class FuturePredictorAgentAdvantage(Agent):
     
-    def make_net(self, input_images, input_measurements, input_actions, input_objectives, reuse=False):
+    def make_net(self, input_images, input_measurements, input_actions, input_objectives, reuse=False, store_objective_coeffs=False):
         if reuse:
             tf.get_variable_scope().reuse_variables()
         
@@ -20,6 +20,9 @@ class FuturePredictorAgentAdvantage(Agent):
         self.fc_val_params['out_dims'][-1] = self.target_dim
         self.fc_adv_params = np.copy(self.fc_joint_params)
         self.fc_adv_params['out_dims'][-1] = len(self.net_discrete_actions) * self.target_dim
+
+        self.objective_coeffs_history = []
+        self.store_objective_coeffs = store_objective_coeffs
         p_img_conv = my_ops.conv_encoder(input_images, self.conv_params, 'p_img_conv', msra_coeff=0.9)
         p_img_fc = my_ops.fc_net(my_ops.flatten(p_img_conv), self.fc_img_params, 'p_img_fc', msra_coeff=0.9)
         p_meas_fc = my_ops.fc_net(input_measurements, self.fc_meas_params, 'p_meas_fc', msra_coeff=0.9)
@@ -109,6 +112,8 @@ class FuturePredictorAgentAdvantage(Agent):
         #Same as act_net above, except we use evolved objective-coeffs. These are different for all 8 simulator-instanciations,
         #since the objectives depend on current state. So, instead of replicating 1 objective-coeffs, we use 8 independent ones.
         curr_objective_coeffs = objective_coeffs
+        if self.store_objectives_to_history:
+            self.objectives_history.append(objective_coeffs)
         #print("Act net evolved with objectives ", curr_objective_coeffs)
 
         #print("**************Calculating action.******************")

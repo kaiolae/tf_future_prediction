@@ -4,6 +4,7 @@ import neat
 import sys
 import numpy as np
 import time
+import os
 
 sys.path = ['../..'] + sys.path
 from DFP.evo_experiment import EvoExperiment
@@ -22,15 +23,16 @@ def set_up_nn_experiment(doom_config_file):
 
     ## Simulator
     simulator_args = {}
-    simulator_args['config'] = "../../maps/"+doom_config_file #'../../maps/D3_battle.cfg'
+    simulator_args['config'] = '../../maps/'+doom_config_file#/D3_battle.cfg'
     simulator_args['resolution'] = (84, 84)
     simulator_args['frame_skip'] = 4#1 #TODO4  # 4 #TODO Change back to 4 for experiements. 1 helps get nicer videos though.
     simulator_args['color_mode'] = 'GRAY'
     simulator_args['maps'] = ['MAP01']
     simulator_args['switch_maps'] = False
     # train
-    simulator_args['num_simulators'] = 8#1 #TODO8  # TODO - Keep 8 to get a more informed fitness measure?
-    simulator_args['record_to_file'] = 'game_replay'
+    simulator_args['num_simulators'] = 8#8#8#1 #TODO8  # TODO - Keep 8 to get a more informed fitness measure?
+    simulator_args['record_to_file'] = "game_recording"
+
 
     ## Experience
     # Train experience
@@ -52,7 +54,6 @@ def set_up_nn_experiment(doom_config_file):
     ## Agent
     agent_args = {}
 
-    agent_args['store_experience_and_objective_values'] = True
     # agent type
     agent_args['agent_type'] = 'advantage'
 
@@ -83,6 +84,9 @@ def set_up_nn_experiment(doom_config_file):
     agent_args['fc_joint_params'] = np.array([(512,), (-1,)], dtype=[
         ('out_dims', int)])  # we put -1 here because it will be automatically replaced when creating the net
     agent_args['weight_decay'] = 0.00000
+
+    agent_args['store_experience_and_objective_values'] = True
+    simulator_args['record_to_file'] = "game_recording"
 
     # optimization parameters
     agent_args['batch_size'] = 64
@@ -123,7 +127,7 @@ def set_up_nn_experiment(doom_config_file):
     # experiment_args['test_objective_coeffs_meas'] = np.array([-1,-1,-1]) KOE Opposite objectives, just for testing.
     experiment_args['test_random_prob'] = 0.
     experiment_args['test_checkpoint'] = 'checkpoints/2017_04_09_09_13_17'  # KOE: This defines the weights to load
-    experiment_args['test_policy_num_steps'] = 2000  # KOE: How many steps to run the test agent.
+    experiment_args['test_policy_num_steps'] = 2000 #TODO 2000  # KOE: How many steps to run the test agent.
     experiment_args['show_predictions'] = False
     experiment_args['multiplayer'] = False
 
@@ -138,49 +142,15 @@ def set_up_nn_experiment(doom_config_file):
 
     return experiment
 
-def store_individual_fitness(genome, doom_config_file):
-    net = neat.nn.FeedForwardNetwork.create(genome, config)
-    experiment_interface = set_up_nn_experiment(doom_config_file)
-    fitness = experiment_interface.test_new_individual(net)
-    print("Fitness was ", fitness)
-    avg_reward_vector = []
-    avg_reward_vector.append(fitness)
-    avg_reward_vector = np.array(avg_reward_vector)
-    f1 = open('reward_stats_with_evolved_nn.csv', 'a+')
-    np.savetxt(f1, avg_reward_vector, delimiter=" ")
-
-def store_individual_behavior(genome):
-
-    net = neat.nn.FeedForwardNetwork.create(genome, config)
-    num_steps_per_dimension = 20
-    measures_range = {"ammo":(0,50),"health" : (0,100), "frags":(0,50)}
-    measures_to_objectives_matrix = [] #Vector of vector where each element has form [m1, m2, m3, o1, o2, o3]
-    col_headers = ["m_ammo", "m_health", "m_frags", "o_ammo", "o_health", "o_frags"]
-
-    for ammo in np.linspace(start=measures_range["ammo"][0], stop=measures_range["ammo"][1], num=num_steps_per_dimension):
-        for health in np.linspace(start=measures_range["health"][0], stop=measures_range["health"][1], num=num_steps_per_dimension):
-            for frags in np.linspace(start=measures_range["frags"][0], stop=measures_range["frags"][1],
-                                      num=num_steps_per_dimension):
-                print(ammo, ", ", health, ", ", frags)
-                nn_output = net.activate([ammo, health, frags])
-                print("Act output: ", nn_output)
-                measures_to_objectives_matrix.append([ammo, health, frags,*nn_output])
-
-    measures_to_objectives_matrix=np.array(measures_to_objectives_matrix)
-    f1=open("nn_behavior_measures_to_objectives.csv", 'w+')
-    for item in col_headers:
-        f1.write(item+" ")
-    f1.write("\n")
-    np.savetxt(f1, measures_to_objectives_matrix, delimiter=" ")
 
 if __name__ == '__main__':
 
     # Either: fitness - to store the re-evaluated fitness of this individual, or behavior - to store the learned measure-objective mappings
     # video -to store a video of agent behavior.
     doom_config_file = sys.argv[1]
-    analysis_mode = sys.argv[2]
+    winner_filename = sys.argv[2] #Pickled winner indiv
 
-    winner_filename = sys.argv[3] #Pickled winner indiv
+    winner_folder = os.path.dirname(winner_filename)
     with open(winner_filename, 'rb') as pickle_file:
         winner_genome = pickle.load(pickle_file)
 
@@ -189,14 +159,8 @@ if __name__ == '__main__':
                          neat.DefaultSpeciesSet, neat.DefaultStagnation,
                          config_file)
 
-    if analysis_mode=="fitness":
-        store_individual_fitness(winner_genome, doom_config_file)
-    elif analysis_mode=="behavior":
-        store_individual_behavior(winner_genome)
-    elif analysis_mode == "video":
-        net = neat.nn.FeedForwardNetwork.create(winner_genome, config)
-        experiment_interface = set_up_nn_experiment(doom_config_file)
-        experiment_interface.test_new_individual(net, store_to_video=True)
-    else:
-        print("Analysis mode ", analysis_mode, " is not supported.")
+    net = neat.nn.FeedForwardNetwork.create(winner_genome, config)
+    experiment_interface = set_up_nn_experiment(doom_config_file)
+    experiment_interface.test_new_individual(net, store_to_video=True) #TODO Video always with same filename. Consider allowing storing to specific dir.
+
 

@@ -11,15 +11,15 @@ game = DoomGame()
 # Use other config file if you wish.
 #TODO: Make input arg.
 game.load_config("../../maps/D3_battle_tiny_health_no_ammo.cfg")
-game.set_episode_timeout(200) #TODO: 2100
+game.set_episode_timeout(500) #TODO: 2100
 
 # Record episodes while playing in 320x240 resolution without HUD
 resX = 640
 resY = 480
 game.set_screen_resolution(ScreenResolution.RES_640X480)
 game.set_render_hud(True)
-game.set_screen_format(ScreenFormat.RGB24)
-
+#Fixed Color issue!!
+game.set_screen_format(ScreenFormat.BGR24)
 
 # Episodes can be recorded in any available mode (PLAYER, ASYNC_PLAYER, SPECTATOR, ASYNC_SPECTATOR)
 game.set_mode(Mode.SPECTATOR)
@@ -37,7 +37,7 @@ for i in range(1,2): #TODO in range(episodes)
 
     vw = VideoWriter('vid'+str(i)+'.avi', fourcc, 24, (resX, resY), True)
 
-    game.replay_episode("game_recording"+str(i)+".lmp")
+    game.replay_episode("game_replay"+str(i)+"_1.lmp")
     frame_counter = 0
     while not game.is_episode_finished():
         if frame_counter%100 == 0:
