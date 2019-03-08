@@ -30,19 +30,22 @@ game.init()
 episodes = 8
 
 
-for i in range(1,2): #TODO in range(episodes)
+for i in range(0,1): #TODO in range(episodes)
     print("Episode: ", i)
 
     fourcc = VideoWriter_fourcc(*'DIVX')
 
     vw = VideoWriter('vid'+str(i)+'.avi', fourcc, 24, (resX, resY), True)
+    meas_file = "meas_history" + str(i)+ ".csv"
+    all_meas = []
 
-    game.replay_episode("game_replay"+str(i)+"_1.lmp")
+    game.replay_episode("game_replay"+str(i)+".lmp")
     frame_counter = 0
     while not game.is_episode_finished():
         if frame_counter%100 == 0:
             print("Frame: ", frame_counter)
         s=game.get_state()
+        all_meas.append(s.game_variables)
         img = s.screen_buffer
         #print("Screen buffer shape: ", img.shape)
         #img=np.transpose(img, (1,2,0))
@@ -63,6 +66,11 @@ for i in range(1,2): #TODO in range(episodes)
         #print("total reward:", game.get_total_reward())
         #print("************************")
         frame_counter+=1
+
+    all_meas = np.array(all_meas)
+    np.savetxt(meas_file, all_meas, delimiter=" ")
+    print("saving meas to ", meas_file)
     vw.release()
+
 
 game.close()

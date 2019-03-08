@@ -53,6 +53,8 @@ class Agent:
         if args['store_experience_and_objective_values'] == True:
             self.objectives_history = []
             self.store_objectives_to_history = True
+        else:
+            self.store_objectives_to_history = False
         
         # net parameters
         self.conv_params = args['conv_params']
@@ -305,13 +307,17 @@ class Agent:
             #We get N (# of diff. simulator instantiations) different meas-vectors. Run each through NN, and send the whole
             #resulting matrix of objectives to act-function.
             adaptive_coeffs = []
+            all_objectives_vectors = [] #For all simulators
             for state_meas_vector in state_meas:
                 #print("ANN inputs: ", state_meas_vector)
                 objectives_vector = evolved_ann.activate(state_meas_vector)
+                all_objectives_vectors.append(objectives_vector)
                 self.agent.objective_coeffs_log.append(objectives_vector)
                 #print("ANN outputs (=objective_meas weights)", objectives_vector)
                 _ ,adaptive_coeffs_vector = my_util.make_objective_indices_and_coeffs(self.agent.objective_coeffs_temporal, objectives_vector) #TODO: Check just what those indices do.
                 adaptive_coeffs.append(adaptive_coeffs_vector)
+            if self.agent.store_objectives_to_history:
+                self.agent.objectives_history.append(np.array(all_objectives_vectors))
 
             #print("Resulting objective matrix (1 row per sim-instantiation) is: ", adaptive_coeffs) #TODO Check print
             adaptive_coeffs=np.array(adaptive_coeffs)

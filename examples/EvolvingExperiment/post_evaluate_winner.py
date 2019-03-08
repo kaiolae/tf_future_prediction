@@ -8,7 +8,7 @@ import time
 sys.path = ['../..'] + sys.path
 from DFP.evo_experiment import EvoExperiment
 
-def set_up_nn_experiment(doom_config_file):
+def set_up_nn_experiment(doom_config_file, num_simulators = 8):
     ### Set all arguments
 
     ## Target maker
@@ -29,7 +29,7 @@ def set_up_nn_experiment(doom_config_file):
     simulator_args['maps'] = ['MAP01']
     simulator_args['switch_maps'] = False
     # train
-    simulator_args['num_simulators'] = 8#1 #TODO8  # TODO - Keep 8 to get a more informed fitness measure?
+    simulator_args['num_simulators'] = num_simulators#8#1 #TODO8  # TODO - Keep 8 to get a more informed fitness measure?
     simulator_args['record_to_file'] = 'game_replay'
 
     ## Experience
@@ -195,7 +195,7 @@ if __name__ == '__main__':
         store_individual_behavior(winner_genome)
     elif analysis_mode == "video":
         net = neat.nn.FeedForwardNetwork.create(winner_genome, config)
-        experiment_interface = set_up_nn_experiment(doom_config_file)
+        experiment_interface = set_up_nn_experiment(doom_config_file, num_simulators=1)
         experiment_interface.test_new_individual(net, store_to_video=True)
     else:
         print("Analysis mode ", analysis_mode, " is not supported.")

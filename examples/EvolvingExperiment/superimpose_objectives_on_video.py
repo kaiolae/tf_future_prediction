@@ -2,14 +2,38 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as tick
 import os
+import neat
+import sys
+import pickle
 
+#TODO: meas history -> get size. make numpy array. send to ANN -> plot.
 # Create a VideoCapture object and read from input file
 # If the input is the camera, pass 0 instead of the video file name
 cap = cv2.VideoCapture('vid1.avi')
-objectives_file = "objectives_history1.csv"
-objective_values = np.genfromtxt(objectives_file, delimiter=' ')
-print("Loaded objectives of shape: ", objective_values.shape)
+meas_file = "meas_history0.csv" #The meas recorded for each frame. ANN can convert to objectives.
+meas_array = np.genfromtxt(meas_file, delimiter = " ")
+objs_array = meas_array
+
+winner_filename = sys.argv[1]  # Pickled winner indiv
+with open(winner_filename, 'rb') as pickle_file:
+    winner_genome = pickle.load(pickle_file)
+
+config_file = "config"
+config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                     neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                     config_file)
+net = neat.nn.FeedForwardNetwork.create(winner_genome, config)
+
+timestep_counter = 0
+for timestep in meas_array:
+    objectives = net.activate(timestep)
+    o_count = 0
+    for o in objectives:
+        objs_array[timestep_counter][o_count] = o
+        o_count+=1
+    timestep_counter+=1
 
 # Check if camera opened successfully
 if (cap.isOpened() == False):
@@ -17,14 +41,13 @@ if (cap.isOpened() == False):
 
 objective_names = ["ammo", "health", "frags"]
 
-# In my current setup, the 3 last obj-vals of each row are the ones we want to show.
-objective_values = objective_values[:, -len(objective_names):]
-
 # Plot loc and size in pixels
 plot_upper_x = 0
 plot_x_width = 100
 plot_upper_y = 0
 plot_y_width = 100
+
+frames_skipped_during_eval = 4 #Skipped every 4 frames during eval -> the objectives measured last 4 "real" frames.
 
 folder = "superimposed_vid"
 if not os.path.exists(folder):
@@ -45,7 +68,9 @@ def convert_plotted_values(plotted_objective_values):
 linestyles = ["-", "--", "-."]
 
 counter = 0
+graph_counter = 0 #Updates the graph every N frames, since we skip frames in eval.
 # Read until video is completed
+
 while (cap.isOpened()):
     # Capture frame-by-frame
     ret, frame = cap.read()
@@ -67,18 +92,26 @@ while (cap.isOpened()):
         for obj in objective_names:
             #print("lin shape:", x.shape)
             #print("obj shape: ",objective_values[0:frame_counter,objcounter].shape)
-            if counter < plot_x_width:
+            if graph_counter < plot_x_width:
                 #Before we have many frames, we just plot all obj vals.
-                ax.plot(convert_plotted_values(objective_values[0:counter, objcounter]), linewidth = 5, label=obj, alpha=0.7, linestyle = linestyles[objcounter])
+                ax.plot(convert_plotted_values(objs_array[0:graph_counter, objcounter]), linewidth = 5, label=obj, alpha=0.7, linestyle = linestyles[objcounter])
             else:
-                ax.plot(convert_plotted_values(objective_values[counter-plot_x_width:counter, objcounter]), linewidth = 5, label=obj, alpha=0.7, linestyle = linestyles[objcounter])
+                ax.plot(convert_plotted_values(objs_array[graph_counter-plot_x_width:graph_counter, objcounter]), linewidth = 5, label=obj, alpha=0.7, linestyle = linestyles[objcounter])
             objcounter+=1
 
         ax.legend(loc='upper right')
 
-        plt.savefig(folder+"/"+str(counter)+".png")
+        plt.gca().set_axis_off()
+        plt.subplots_adjust(top=1, bottom=0, right=1, left=0,
+                        hspace=0, wspace=0)
+        plt.margins(0, 0)
+        plt.gca().xaxis.set_major_locator(tick.NullLocator())
+        plt.gca().yaxis.set_major_locator(tick.NullLocator())
+        plt.savefig(folder+"/"+str(counter)+".png",bbox_inches="tight", pad_inches=0)
         plt.close(fig)
         counter += 1
+        if counter%frames_skipped_during_eval==0:
+            graph_counter+=1
 
 # When everything done, release the video capture object
 cap.release()
