@@ -11,8 +11,9 @@ import pickle
 #TODO: meas history -> get size. make numpy array. send to ANN -> plot.
 # Create a VideoCapture object and read from input file
 # If the input is the camera, pass 0 instead of the video file name
-cap = cv2.VideoCapture('vid1.avi')
-meas_file = "meas_history0.csv" #The meas recorded for each frame. ANN can convert to objectives.
+video_id = 0
+cap = cv2.VideoCapture('vid'+str(video_id)+'0.avi')
+meas_file = "meas_history"+str(video_id)+"0.csv" #The meas recorded for each frame. ANN can convert to objectives.
 meas_array = np.genfromtxt(meas_file, delimiter = " ")
 objs_array = meas_array
 
@@ -47,7 +48,7 @@ plot_x_width = 100
 plot_upper_y = 0
 plot_y_width = 100
 
-frames_skipped_during_eval = 4 #Skipped every 4 frames during eval -> the objectives measured last 4 "real" frames.
+#frames_skipped_during_eval = 4 #Skipped every 4 frames during eval -> the objectives measured last 4 "real" frames.
 
 folder = "superimposed_vid"
 if not os.path.exists(folder):
@@ -68,7 +69,6 @@ def convert_plotted_values(plotted_objective_values):
 linestyles = ["-", "--", "-."]
 
 counter = 0
-graph_counter = 0 #Updates the graph every N frames, since we skip frames in eval.
 # Read until video is completed
 
 while (cap.isOpened()):
@@ -92,11 +92,11 @@ while (cap.isOpened()):
         for obj in objective_names:
             #print("lin shape:", x.shape)
             #print("obj shape: ",objective_values[0:frame_counter,objcounter].shape)
-            if graph_counter < plot_x_width:
+            if counter < plot_x_width:
                 #Before we have many frames, we just plot all obj vals.
-                ax.plot(convert_plotted_values(objs_array[0:graph_counter, objcounter]), linewidth = 5, label=obj, alpha=0.7, linestyle = linestyles[objcounter])
+                ax.plot(convert_plotted_values(objs_array[0:counter, objcounter]), linewidth = 5, label=obj, alpha=0.7, linestyle = linestyles[objcounter])
             else:
-                ax.plot(convert_plotted_values(objs_array[graph_counter-plot_x_width:graph_counter, objcounter]), linewidth = 5, label=obj, alpha=0.7, linestyle = linestyles[objcounter])
+                ax.plot(convert_plotted_values(objs_array[counter-plot_x_width:counter, objcounter]), linewidth = 5, label=obj, alpha=0.7, linestyle = linestyles[objcounter])
             objcounter+=1
 
         ax.legend(loc='upper right')
@@ -110,8 +110,6 @@ while (cap.isOpened()):
         plt.savefig(folder+"/"+str(counter)+".png",bbox_inches="tight", pad_inches=0)
         plt.close(fig)
         counter += 1
-        if counter%frames_skipped_during_eval==0:
-            graph_counter+=1
 
 # When everything done, release the video capture object
 cap.release()
